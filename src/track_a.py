@@ -1,87 +1,118 @@
-import numpy as np
-import os
+"""
+Advanced Analytical PCA Track.
+
+Conducts Singular Value Decomposition to orthogonally project digit image
+tensors into low-dimensional representations while preserving variance.
+"""
+
 import sys
 import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, GLOBAL_RANDOM_SEED, setup_professional_logger
 from src.models import SoftmaxRegression
-from src.utils import train_model, evaluate
+from src.utils import evaluate, train_model
 
-def pca_svd(X, n_components):
-    # Center the data
-    mean = np.mean(X, axis=0)
-    X_centered = X - mean
-    
-    # SVD
-    U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
-    
-    return U, S, Vt, mean
+logger = setup_professional_logger(__name__)
 
-def run_track_a():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(base_dir, 'data', 'digits_data.npz')
-    split_path = os.path.join(base_dir, 'data', 'digits_split_indices.npz')
-    
-    data = np.load(data_path)
-    splits = np.load(split_path)
-    
-    X = data['X']
-    y = data['y']
-    
-    train_idx = splits['train_idx']
-    val_idx = splits['val_idx']
-    test_idx = splits['test_idx']
-    
-    X_train, y_train = X[train_idx], y[train_idx]
-    X_val, y_val = X[val_idx], y[val_idx]
-    X_test, y_test = X[test_idx], y[test_idx]
-    
-    # 1. PCA/SVD
-    _, S, Vt, mean = pca_svd(X_train, X_train.shape[1])
-    
-    # Scree Plot
-    explained_variance = (S ** 2) / (X_train.shape[0] - 1)
-    explained_variance_ratio = explained_variance / np.sum(explained_variance)
-    
-    figures_dir = os.path.join(base_dir, 'figures')
-    os.makedirs(figures_dir, exist_ok=True)
-    
-    plt.figure(figsize=(8, 6))
-    plt.plot(np.cumsum(explained_variance_ratio), marker='o')
-    plt.title('Scree Plot (Cumulative Explained Variance)')
-    plt.xlabel('Number of Components')
-    plt.ylabel('Cumulative Explained Variance')
-    plt.grid(True)
-    plt.savefig(os.path.join(figures_dir, 'scree_plot.png'))
-    plt.close()
-    
-    # 2D PCA Visualization
-    X_train_centered = X_train - mean
-    X_train_pca2 = X_train_centered.dot(Vt[:2].T)
-    
-    plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(X_train_pca2[:, 0], X_train_pca2[:, 1], c=y_train, cmap='tab10', alpha=0.6, s=15)
-    plt.colorbar(scatter, label='Digit Class')
-    plt.title('2D PCA Visualization of Digits Data')
-    plt.xlabel('Principal Component 1')
-    plt.ylabel('Principal Component 2')
-    plt.savefig(os.path.join(figures_dir, 'pca_2d.png'))
-    plt.close()
-    
-    # Softmax on PCA dimensions m = {10, 20, 40}
-    print("\nTrack A: Softmax Comparison at fixed PCA dimensions m in {10, 20, 40}")
-    m_values = [10, 20, 40]
-    for m in m_values:
-        V_m = Vt[:m].T
-        X_train_m = (X_train - mean).dot(V_m)
-        X_val_m = (X_val - mean).dot(V_m)
-        X_test_m = (X_test - mean).dot(V_m)
-        
-        sm = SoftmaxRegression(m, 10, l2_reg=1e-4)
-        np.random.seed(42)
-        train_model(sm, X_train_m, y_train, X_val_m, y_val, epochs=200, batch_size=64, lr=0.1, use_best_val=True)
-        ce, acc = evaluate(sm, X_test_m, y_test)
-        print(f"PCA m={m} | Test Acc: {acc:.4f} | Test CE: {ce:.4f}")
+PCA_MANIFOLD_DIMENSIONS = [10, 20, 40]
+
+
+def execute_principal_component_analysis(features: np.ndarray, retained_components: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Performs PCA via SVD on mean-centered features.
+
+    Args:
+        features (np.ndarray): Input feature matrix of shape (n, d).
+        retained_components (int): Maximum number of principal components to retain.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Left singular vectors (n, d),
+            singular values (min(n,d),), right singular vectors transposed (d, d),
+            and per-feature mean vector (d,).
+    """
+    dimension_means = np.mean(features, axis=0)
+    centered_features = features - dimension_means
+
+    left_singular, singular_values, right_singular_transposed = np.linalg.svd(centered_features, full_matrices=False)
+
+    return left_singular, singular_values, right_singular_transposed, dimension_means
+
+
+def launch_advanced_pca_investigations() -> None:
+    """
+    Runs the full Track A pipeline including scree plot, 2D visualization, and PCA ablation.
+
+    Returns:
+        None
+    """
+    dataset_filepath = DATA_DIR / 'digits_data.npz'
+    index_split_filepath = DATA_DIR / 'digits_split_indices.npz'
+
+    try:
+        extracted_data = np.load(dataset_filepath)
+        extracted_splits = np.load(index_split_filepath)
+
+        pixel_features = extracted_data['X']
+        class_labels = extracted_data['y']
+
+        indices_train = extracted_splits['train_idx']
+        indices_validate = extracted_splits['val_idx']
+        indices_test = extracted_splits['test_idx']
+
+        features_train, labels_train = pixel_features[indices_train], class_labels[indices_train]
+        features_val, labels_val = pixel_features[indices_validate], class_labels[indices_validate]
+        features_test, labels_test = pixel_features[indices_test], class_labels[indices_test]
+    except (FileNotFoundError, KeyError) as err:
+        logger.error(f"Critical data ingestion failure. Exiting PCA Track -> {err}")
+        sys.exit(1)
+
+    _, singular_spectrum, principal_axes, feature_means = execute_principal_component_analysis(features_train, features_train.shape[1])
+
+    variance_magnitudes = (singular_spectrum ** 2) / (features_train.shape[0] - 1)
+    normalized_variance_ratios = variance_magnitudes / np.sum(variance_magnitudes)
+
+    try:
+        plt.figure(figsize=(8, 6))
+        plt.plot(np.cumsum(normalized_variance_ratios), marker='o')
+        plt.title('Scree Plot Detailing Cumulative Explained Phenomenological Variance')
+        plt.xlabel('Quantity of Extracted Components')
+        plt.ylabel('Accumulated Variance Fraction')
+        plt.grid(True)
+        plt.savefig(str(FIGURES_DIR / 'scree_plot.png'))
+        plt.close()
+
+        centered_train = features_train - feature_means
+        planar_projections = centered_train.dot(principal_axes[:2].T)
+
+        plt.figure(figsize=(8, 6))
+        scatter_plot = plt.scatter(planar_projections[:, 0], planar_projections[:, 1], c=labels_train, cmap='tab10', alpha=0.6, s=15)
+        plt.colorbar(scatter_plot, label='Digit Categorical Class')
+        plt.title('Orthogonal 2D Visualization Mapping Distinct Digit Clouds')
+        plt.xlabel('Dominant Principal Component')
+        plt.ylabel('Secondary Principal Component')
+        plt.savefig(str(FIGURES_DIR / 'pca_2d.png'))
+        plt.close()
+    except Exception as e:
+        logger.error(f"Visualization render engine failed -> {e}")
+
+    logger.info(f"Executing Track A Assessments: Benchmarking Generalized Softmax Across Configured Reduced Capacities m={PCA_MANIFOLD_DIMENSIONS}")
+    total_categories = 10
+
+    for dimension_slice in PCA_MANIFOLD_DIMENSIONS:
+        sliced_orthogonal_basis = principal_axes[:dimension_slice].T
+        compact_train = (features_train - feature_means).dot(sliced_orthogonal_basis)
+        compact_validate = (features_val - feature_means).dot(sliced_orthogonal_basis)
+        compact_test = (features_test - feature_means).dot(sliced_orthogonal_basis)
+
+        linear_classifier = SoftmaxRegression(dimension_slice, total_categories, l2_regularization=CROSS_ENTROPY_L2_REGULARIZATION)
+        np.random.seed(GLOBAL_RANDOM_SEED)
+        train_model(linear_classifier, compact_train, labels_train, compact_validate, labels_val, epochs=200, batch_size=64, learning_rate=0.1, use_best_validation=True)
+        terminal_entropy, terminal_accuracy = evaluate(linear_classifier, compact_test, labels_test)
+        logger.info(f"Subspace Configuration m={dimension_slice} | Validation Accuracy: {terminal_accuracy:.4f} | Measured Entropy: {terminal_entropy:.4f}")
+
 
 if __name__ == '__main__':
-    run_track_a()
+    launch_advanced_pca_investigations()

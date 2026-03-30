@@ -1,127 +1,185 @@
-import numpy as np
-import os
+"""
+MNIST Digits Benchmark Evaluation.
+
+Executes a robust statistical framework for comparing modeling architectures
+against real-world digit image pixels using repeated random seed instantiations.
+"""
+
 import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.models import SoftmaxRegression,OneHiddenLayerNN
-from src.utils import train_model,evaluate
 import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
 
-def load_digits_data(root_folder):
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, setup_professional_logger
+from src.models import OneHiddenLayerNN, SoftmaxRegression
+from src.utils import evaluate, train_model
 
-    #creating path
+logger = setup_professional_logger(__name__)
 
-    data_file=os.path.join(root_folder,"data","digits_data.npz")
-    split_file=os.path.join(root_folder,"data","digits_split_indices.npz")
-
-    #Loading data
-    digits_data=np.load(data_file)
-    split_inform=np.load(split_file)
-    X_data=digits_data["X"]
-    y_labels=digits_data["y"]
-
-    #Getting indexs
-    train_indx=split_inform["train_idx"]
-    val_indx=split_inform["val_idx"]
-    test_indx=split_inform["test_idx"]
-
-    #Splitting data
-    train_dataset=(X_data[train_indx],y_labels[train_indx])
-    val_dataset=(X_data[val_indx],y_labels[val_indx])
-    test_dataset=(X_data[test_indx],y_labels[test_indx])
-
-    return train_dataset,val_dataset,test_dataset
-
-def evaluate_multiple_runs(model_cls,model_params,X_train,y_train,X_val,y_val,
-    X_test,y_test,num_runs=5,lr=0.05):
-    print(f"\nRunning experiments with {num_runs} different seeds for {model_cls.__name__}")
-    acc_list=[]
-    ce_list=[]
-
-    for i in range(num_runs):
-        np.random.seed(i)
-        model=model_cls(**model_params)
-
-        #model training
-
-        train_model(model,X_train,y_train,X_val,y_val,epochs=200,batch_size=64,lr=lr,use_best_val=True)
-
-        #testing
-        ce_val,acc_val=evaluate(model,X_test,y_test)
-
-        acc_list.append(acc_val)
-        ce_list.append(ce_val)
-
-        print(f"[Run {i}] acc={acc_val:.4f}, ce={ce_val:.4f}")
-
-    #Calculations
-    acc_mean=np.mean(acc_list)
-    acc_std=np.std(acc_list,ddof=1)
-    acc_ci=2.776*acc_std /np.sqrt(num_runs)
+LEARNING_RATE_ABLATION_SWEEPS = [0.005, 0.05, 0.2]
+BENCHMARK_ITERATION_SEEDS = 5
 
 
-    ce_mean=np.mean(ce_list)
-    ce_std=np.std(ce_list,ddof=1)
-    ce_ci=2.776*ce_std /np.sqrt(num_runs)
+def load_digit_arrays() -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """
+    Loads and splits the digits dataset into train, validation, and test subsets.
+
+    Returns:
+        tuple: Three tuples of (features, labels) for train, validation, and test splits,
+            where features are np.ndarray of shape (n_split, 64) and labels are np.ndarray
+            of shape (n_split,).
+    """
+    dataset_filepath = DATA_DIR / 'digits_data.npz'
+    index_split_filepath = DATA_DIR / 'digits_split_indices.npz'
+
+    try:
+        extracted_data = np.load(dataset_filepath)
+        extracted_splits = np.load(index_split_filepath)
+
+        pixel_features = extracted_data['X']
+        class_labels = extracted_data['y']
+
+        indices_train = extracted_splits['train_idx']
+        indices_validate = extracted_splits['val_idx']
+        indices_test = extracted_splits['test_idx']
+
+        return (
+            (pixel_features[indices_train], class_labels[indices_train]),
+            (pixel_features[indices_validate], class_labels[indices_validate]),
+            (pixel_features[indices_test], class_labels[indices_test])
+        )
+    except FileNotFoundError as err:
+        logger.error(f"Fatal System Error: Dataset archive matrix missing -> {err}")
+        sys.exit(1)
+    except KeyError as key_err:
+        logger.error(f"Archive Integrity Compromised: Missing internal array slice pointer -> {key_err}")
+        sys.exit(1)
 
 
-    print('\nSummary')
-    print(f"{model_cls.__name__}->Acc:{acc_mean:.4f}±{acc_ci:.4f}")
-    print(f"{model_cls.__name__}->CE:{ce_mean:.4f}±{ce_ci:.4f}")
+def evaluate_statistical_seeds(
+    architecture_class,
+    architecture_parameters: dict,
+    features_train: np.ndarray,
+    labels_train: np.ndarray,
+    features_val: np.ndarray,
+    labels_val: np.ndarray,
+    features_test: np.ndarray,
+    labels_test: np.ndarray,
+    total_instantiations: int = BENCHMARK_ITERATION_SEEDS,
+    descent_rate: float = 0.05
+) -> None:
+    """
+    Evaluates a model architecture across multiple random seeds and reports aggregated statistics.
 
-def run_experiments_on_digits():
-    project_root=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    (X_train,y_train),(X_val,y_val),(X_test,y_test)=load_digits_data(project_root)
+    Args:
+        architecture_class (type): Model class to instantiate (SoftmaxRegression or OneHiddenLayerNN).
+        architecture_parameters (dict): Keyword arguments passed to the model constructor.
+        features_train (np.ndarray): Training feature matrix of shape (n_train, d).
+        labels_train (np.ndarray): Training label array of shape (n_train,).
+        features_val (np.ndarray): Validation feature matrix of shape (n_val, d).
+        labels_val (np.ndarray): Validation label array of shape (n_val,).
+        features_test (np.ndarray): Test feature matrix of shape (n_test, d).
+        labels_test (np.ndarray): Test label array of shape (n_test,).
+        total_instantiations (int): Number of independent random seeds to evaluate.
+        descent_rate (float): Learning rate for gradient descent optimization.
+
+    Returns:
+        None
+    """
+    logger.info(f"Executing {total_instantiations} independent evaluations for {architecture_class.__name__}...")
+    accuracy_measurements = []
+    entropy_measurements = []
+
+    for randomized_seed in range(total_instantiations):
+        np.random.seed(randomized_seed)
+        classifier_instance = architecture_class(**architecture_parameters)
+        train_model(
+            classifier_instance,
+            features_train,
+            labels_train,
+            features_val,
+            labels_val,
+            epochs=200,
+            batch_size=64,
+            learning_rate=descent_rate,
+            use_best_validation=True
+        )
+
+        terminal_entropy, terminal_accuracy = evaluate(classifier_instance, features_test, labels_test)
+        accuracy_measurements.append(terminal_accuracy)
+        entropy_measurements.append(terminal_entropy)
+        logger.info(f"Algorithm Instance {randomized_seed+1}: Holdout Accuracy = {terminal_accuracy:.4f}, Holdout Entropy = {terminal_entropy:.4f}")
+
+    average_accuracy = np.mean(accuracy_measurements)
+    deviation_accuracy = np.std(accuracy_measurements, ddof=1)
+    confidence_interval_accuracy = 2.776 * (deviation_accuracy / np.sqrt(total_instantiations))
+
+    average_entropy = np.mean(entropy_measurements)
+    deviation_entropy = np.std(entropy_measurements, ddof=1)
+    confidence_interval_entropy = 2.776 * (deviation_entropy / np.sqrt(total_instantiations))
+
+    logger.info(f"Aggregated Performance Metrics [{architecture_class.__name__}]: "
+                f"Mean Accuracy: {average_accuracy:.4f} \u00B1 {confidence_interval_accuracy:.4f} | "
+                f"Mean Entropy: {average_entropy:.4f} \u00B1 {confidence_interval_entropy:.4f}")
 
 
-    input_size=X_train.shape[1]
-    n_classes=10
+def execute_digits_benchmark() -> None:
+    """
+    Coordinates the full digits benchmark including seed evaluation and learning rate ablation.
 
-    print("\nModel Comparison (Repeated Runs)")
+    Returns:
+        None
+    """
+    (features_train, labels_train), (features_val, labels_val), (features_test, labels_test) = load_digit_arrays()
+    total_pixel_dimensions = features_train.shape[1]
+    total_classification_categories = 10
 
-    # Repeated-seed statistics for Softmax and NN
+    evaluate_statistical_seeds(
+        SoftmaxRegression,
+        {'input_dimensions': total_pixel_dimensions, 'total_classes': total_classification_categories, 'l2_regularization': CROSS_ENTROPY_L2_REGULARIZATION},
+        features_train, labels_train, features_val, labels_val, features_test, labels_test,
+        descent_rate=0.1
+    )
 
-    evaluate_multiple_runs(SoftmaxRegression,
-    {"input_dim":input_size,"num_classes":n_classes,"l2_reg":1e-4},
-    X_train,y_train,X_val,y_val,X_test,y_test,num_runs=5,lr=0.1)
+    evaluate_statistical_seeds(
+        OneHiddenLayerNN,
+        {'input_dimensions': total_pixel_dimensions, 'hidden_dimensions': 32, 'total_classes': total_classification_categories, 'l2_regularization': CROSS_ENTROPY_L2_REGULARIZATION},
+        features_train, labels_train, features_val, labels_val, features_test, labels_test,
+        descent_rate=0.1
+    )
 
+    logger.info("Executing Descent Rate Dynamical Ablation mapping Phase...")
 
-    evaluate_multiple_runs(OneHiddenLayerNN,
-    {"input_dim":input_size,"hidden_dim":32,"num_classes":n_classes,"l2_reg":1e-4},
-    X_train,y_train,X_val,y_val,X_test,y_test,num_runs=5,lr=0.1)
+    try:
+        plt.figure(figsize=(10, 6))
+        for specified_rate in LEARNING_RATE_ABLATION_SWEEPS:
+            np.random.seed(42)
+            ablated_network = OneHiddenLayerNN(total_pixel_dimensions, 32, total_classification_categories)
+            training_history_log = train_model(
+                ablated_network,
+                features_train,
+                labels_train,
+                features_val,
+                labels_val,
+                epochs=100,
+                batch_size=64,
+                learning_rate=specified_rate,
+                return_history=True,
+                use_best_validation=False
+            )
+            plt.plot(training_history_log['val_loss'], label=f'Descent Speed = {specified_rate}')
+            logger.info(f"Speed Rate {specified_rate}: Ultimate Validation Entropy Metric: {training_history_log['val_loss'][-1]:.4f}")
 
-    #Learning Rate ablation on digits (for NN)
-    print("\nLearning Rate Experiment(NN)")
+        plt.title('Validation Cross-Entropy Dynamics Distinguishing Parameter Updates')
+        plt.xlabel('Iterative Epoch Configuration')
+        plt.ylabel('Recorded Validation Entropy Measure')
+        plt.legend()
+        plt.savefig(str(FIGURES_DIR / 'lr_ablation.png'))
+        plt.close()
+    except Exception as graphical_err:
+        logger.error(f"Failed to compile graphic outputs. Matplotlib runtime crash -> {graphical_err}")
 
-    lr_values=[0.005, 0.05, 0.2]
-    fig_path=os.path.join(project_root,"figures")
-    os.makedirs(fig_path,exist_ok=True)
-
-
-    plt.figure(figsize=(10,6))
-
-    for i in lr_values:
-        np.random.seed(42)
-        model=OneHiddenLayerNN(input_size,32,n_classes)
-
-        history=train_model(model,X_train,y_train,X_val,y_val,epochs=100,batch_size=64,
-        lr=i,return_history=True,use_best_val=False)
-
-        val_losses=history["val_loss"]
-        plt.plot(val_losses,label=f"lr={i}")
-
-        print(f"lr={i}->final val loss: {val_losses[-1]:.4f}")
-
-    plt.title("Validation Loss vs Epochs (Different Learning Rates)")
-    plt.xlabel("Epoch")
-    plt.ylabel("Validation Loss")
-    plt.legend()
-
-    save_file=os.path.join(fig_path,"lr_ablation.png")
-    plt.savefig(save_file)
-    plt.close()
-
-    print(f"\nFigure saved to:{save_file}")
 
 if __name__ == "__main__":
-    run_experiments_on_digits()
+    execute_digits_benchmark()

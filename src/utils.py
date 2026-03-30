@@ -1,73 +1,159 @@
-import numpy as np
+"""
+Utility Functions for Model Training and Evaluation.
+
+Provides core functions for evaluating model performance, executing training loops
+with batching and validation, and plotting decision boundaries for two-dimensional environments.
+"""
+
 import matplotlib.pyplot as plt
+import numpy as np
 
-def evaluate(model, X, y):
-    loss = model.compute_loss(X, y)
-    preds = model.predict(X)
-    acc = np.mean(preds == y)
-    return loss, acc
 
-def train_model(model, X_train, y_train, X_val=None, y_val=None, 
-                epochs=200, batch_size=64, lr=0.05, return_history=False, use_best_val=True):
-    n_samples = X_train.shape[0]
-    best_val_loss = float('inf')
+def evaluate(model, features: np.ndarray, labels: np.ndarray) -> tuple[float, float]:
+    """
+    Evaluates the prediction accuracy and cross-entropy loss of a trained model.
+
+    Args:
+        model (SoftmaxRegression or OneHiddenLayerNN): Trained classifier instance.
+        features (np.ndarray): Input feature matrix of shape (n, d).
+        labels (np.ndarray): Ground-truth class label array of shape (n,).
+
+    Returns:
+        tuple[float, float]: Cross-entropy loss and classification accuracy as a fraction.
+    """
+    cross_entropy_loss = model.compute_loss(features, labels)
+    predicted_classes = model.predict(features)
+    classification_accuracy = np.mean(predicted_classes == labels)
+    return cross_entropy_loss, classification_accuracy
+
+
+def train_model(
+    model,
+    features_train: np.ndarray,
+    labels_train: np.ndarray,
+    features_val: np.ndarray = None,
+    labels_val: np.ndarray = None,
+    epochs: int = 200,
+    batch_size: int = 64,
+    learning_rate: float = 0.05,
+    return_history: bool = False,
+    use_best_validation: bool = True
+) -> dict[str, list[float]] | None:
+    """
+    Executes the mini-batch gradient descent training loop over specified epochs.
+
+    Args:
+        model (SoftmaxRegression or OneHiddenLayerNN): Model instance to train.
+        features_train (np.ndarray): Training feature matrix of shape (n_train, d).
+        labels_train (np.ndarray): Training label array of shape (n_train,).
+        features_val (np.ndarray or None): Validation feature matrix of shape (n_val, d).
+        labels_val (np.ndarray or None): Validation label array of shape (n_val,).
+        epochs (int): Maximum number of training epochs.
+        batch_size (int): Number of samples per mini-batch.
+        learning_rate (float): Step size for gradient descent updates.
+        return_history (bool): If True, returns the training history dictionary.
+        use_best_validation (bool): If True, restores weights from the best validation epoch.
+
+    Returns:
+        dict[str, list[float]] or None: Training history containing 'train_loss',
+            'train_acc', 'val_loss', and 'val_acc' lists if return_history is True,
+            otherwise None.
+    """
+    total_samples = features_train.shape[0]
+    best_validation_loss = float('inf')
     best_weights = None
-    
-    history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
-    
-    for epoch in range(epochs):
-        indices = np.random.permutation(n_samples)
-        X_shuffled = X_train[indices]
-        y_shuffled = y_train[indices]
-        
-        for i in range(0, n_samples, batch_size):
-            X_batch = X_shuffled[i:i+batch_size]
-            y_batch = y_shuffled[i:i+batch_size]
-            
-            if hasattr(model, 'W2'):
-                dW1, db1, dW2, db2 = model.backward(X_batch, y_batch)
-                model.update(dW1, db1, dW2, db2, lr)
-            else:
-                dW, db = model.backward(X_batch, y_batch)
-                model.update(dW, db, lr)
-                
-        train_loss, train_acc = evaluate(model, X_train, y_train)
-        history['train_loss'].append(train_loss)
-        history['train_acc'].append(train_acc)
-        
-        if X_val is not None and y_val is not None:
-            val_loss, val_acc = evaluate(model, X_val, y_val)
-            history['val_loss'].append(val_loss)
-            history['val_acc'].append(val_acc)
-            
-            if use_best_val and val_loss < best_val_loss:
-                best_val_loss = val_loss
-                if hasattr(model, 'W2'):
-                    best_weights = (model.W1.copy(), model.b1.copy(), model.W2.copy(), model.b2.copy())
-                else:
-                    best_weights = (model.W.copy(), model.b.copy())
-                    
-    if use_best_val and best_weights is not None:
-        if hasattr(model, 'W2'):
-            model.W1, model.b1, model.W2, model.b2 = best_weights
-        else:
-            model.W, model.b = best_weights
-            
-    if return_history:
-        return history
 
-def plot_decision_boundary(model, X, y, title, filepath):
-    x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
-    y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),
-                         np.arange(y_min, y_max, 0.02))
-                         
-    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
-    
+    training_history = {
+        'train_loss': [],
+        'train_acc': [],
+        'val_loss': [],
+        'val_acc': []
+    }
+
+    for epoch in range(epochs):
+        shuffled_indices = np.random.permutation(total_samples)
+        features_shuffled = features_train[shuffled_indices]
+        labels_shuffled = labels_train[shuffled_indices]
+
+        for batch_start in range(0, total_samples, batch_size):
+            batch_end = batch_start + batch_size
+            features_batch = features_shuffled[batch_start:batch_end]
+            labels_batch = labels_shuffled[batch_start:batch_end]
+
+            if hasattr(model, 'weight_matrix_2'):
+                gradient_w1, gradient_b1, gradient_w2, gradient_b2 = model.backward(features_batch, labels_batch)
+                model.update(gradient_w1, gradient_b1, gradient_w2, gradient_b2, learning_rate)
+            else:
+                gradient_w, gradient_b = model.backward(features_batch, labels_batch)
+                model.update(gradient_w, gradient_b, learning_rate)
+
+        train_loss, train_acc = evaluate(model, features_train, labels_train)
+        training_history['train_loss'].append(train_loss)
+        training_history['train_acc'].append(train_acc)
+
+        if features_val is not None and labels_val is not None:
+            val_loss, val_acc = evaluate(model, features_val, labels_val)
+            training_history['val_loss'].append(val_loss)
+            training_history['val_acc'].append(val_acc)
+
+            if use_best_validation and val_loss < best_validation_loss:
+                best_validation_loss = val_loss
+                if hasattr(model, 'weight_matrix_2'):
+                    best_weights = (
+                        model.weight_matrix_1.copy(),
+                        model.bias_vector_1.copy(),
+                        model.weight_matrix_2.copy(),
+                        model.bias_vector_2.copy()
+                    )
+                else:
+                    best_weights = (model.weight_matrix.copy(), model.bias_vector.copy())
+
+    if use_best_validation and best_weights is not None:
+        if hasattr(model, 'weight_matrix_2'):
+            model.weight_matrix_1, model.bias_vector_1, model.weight_matrix_2, model.bias_vector_2 = best_weights
+        else:
+            model.weight_matrix, model.bias_vector = best_weights
+
+    if return_history:
+        return training_history
+    return None
+
+
+def plot_decision_boundary(
+    model,
+    features: np.ndarray,
+    labels: np.ndarray,
+    plot_title: str,
+    save_filepath: str
+) -> None:
+    """
+    Renders the model decision boundaries over a 2D feature space and saves the plot.
+
+    Args:
+        model (SoftmaxRegression or OneHiddenLayerNN): Trained classifier instance.
+        features (np.ndarray): Input feature matrix of shape (n, 2).
+        labels (np.ndarray): Ground-truth class label array of shape (n,).
+        plot_title (str): Title displayed above the generated figure.
+        save_filepath (str): Absolute or relative path where the PNG image is saved.
+    """
+    x_axis_min = features[:, 0].min() - 0.5
+    x_axis_max = features[:, 0].max() + 0.5
+    y_axis_min = features[:, 1].min() - 0.5
+    y_axis_max = features[:, 1].max() + 0.5
+
+    mesh_grid_x, mesh_grid_y = np.meshgrid(
+        np.arange(x_axis_min, x_axis_max, 0.02),
+        np.arange(y_axis_min, y_axis_max, 0.02)
+    )
+
+    grid_coordinates = np.c_[mesh_grid_x.ravel(), mesh_grid_y.ravel()]
+    predictions = model.predict(grid_coordinates)
+    prediction_surface = predictions.reshape(mesh_grid_x.shape)
+
     plt.figure(figsize=(8, 6))
-    plt.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.Spectral)
-    plt.scatter(X[:, 0], X[:, 1], c=y, s=40, edgecolors='k', cmap=plt.cm.Spectral)
-    plt.title(title)
-    plt.savefig(filepath)
+    plt.contourf(mesh_grid_x, mesh_grid_y, prediction_surface, alpha=0.3, cmap=plt.cm.Spectral)
+    plt.scatter(features[:, 0], features[:, 1], c=labels, s=40, edgecolors='k', cmap=plt.cm.Spectral)
+
+    plt.title(plot_title)
+    plt.savefig(save_filepath)
     plt.close()
