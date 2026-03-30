@@ -12,8 +12,9 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, GLOBAL_RANDOM_SEED, setup_logger
-from src.models import SoftmaxRegression
-from src.utils import evaluate, train_model
+from src.models.linear import SoftmaxRegression
+from src.core.metrics import evaluate
+from src.core.trainer import train_model
 
 logger = setup_logger(__name__)
 

@@ -12,8 +12,10 @@ import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.config import DATA_DIR, FIGURES_DIR, setup_logger
-from src.models import OneHiddenLayerNN, SoftmaxRegression
-from src.utils import plot_decision_boundary, train_model
+from src.models.neural import OneHiddenLayerNN
+from src.models.linear import SoftmaxRegression
+from src.visualization.plotters import plot_decision_boundary
+from src.core.trainer import train_model
 
 logger = setup_logger(__name__)
 
