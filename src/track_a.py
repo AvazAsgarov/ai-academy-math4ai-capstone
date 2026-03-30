@@ -11,11 +11,11 @@ import numpy as np
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, GLOBAL_RANDOM_SEED, setup_professional_logger
+from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, GLOBAL_RANDOM_SEED, setup_logger
 from src.models import SoftmaxRegression
 from src.utils import evaluate, train_model
 
-logger = setup_professional_logger(__name__)
+logger = setup_logger(__name__)
 
 PCA_MANIFOLD_DIMENSIONS = [10, 20, 40]
 

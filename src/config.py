@@ -21,7 +21,7 @@ GLOBAL_RANDOM_SEED: int = 42
 CROSS_ENTROPY_L2_REGULARIZATION: float = 1e-4
 
 
-def setup_professional_logger(logger_name: str) -> logging.Logger:
+def setup_logger(logger_name: str) -> logging.Logger:
     """
     Constructs a timestamped console logger replacing standard print output.
 

@@ -11,11 +11,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src.config import DATA_DIR, FIGURES_DIR, setup_professional_logger
+from src.config import DATA_DIR, FIGURES_DIR, setup_logger
 from src.models import OneHiddenLayerNN, SoftmaxRegression
 from src.utils import plot_decision_boundary, train_model
 
-logger = setup_professional_logger(__name__)
+logger = setup_logger(__name__)
 
 
 def extract_compressed_dataset(dataset_path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

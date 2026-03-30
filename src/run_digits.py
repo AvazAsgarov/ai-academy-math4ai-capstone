@@ -11,11 +11,11 @@ import numpy as np
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, setup_professional_logger
+from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, setup_logger
 from src.models import OneHiddenLayerNN, SoftmaxRegression
 from src.utils import evaluate, train_model
 
-logger = setup_professional_logger(__name__)
+logger = setup_logger(__name__)
 
 LEARNING_RATE_ABLATION_SWEEPS = [0.005, 0.05, 0.2]
 BENCHMARK_ITERATION_SEEDS = 5
