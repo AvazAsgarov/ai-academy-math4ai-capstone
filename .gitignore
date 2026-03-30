@@ -6,3 +6,17 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# LaTeX files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Specific project files to ignore
+*evaluation_sheet*
+*assignment*
+
