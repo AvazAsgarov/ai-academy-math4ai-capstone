@@ -129,19 +129,19 @@ def test_nn_backward_shapes():
 
 
 if __name__ == "__main__":
-    print("\n── math_utils sanity tests ──")
+    print("\n--- math_utils sanity tests ---")
     test_softmax_values()
     test_softmax_sums_to_one()
     test_softmax_numerical_stability()
     test_cross_entropy_value()
     
-    print("\n── SoftmaxRegression tests ──")
+    print("\n--- SoftmaxRegression tests ---")
     test_forward_shapes()
     test_forward_probs_sum_to_one()
     test_backward_shapes()
     test_loss_decreases()
 
-    print("\n── OneHiddenLayerNN tests ──")
+    print("\n--- OneHiddenLayerNN tests ---")
     test_nn_backward_shapes()
     
-    print("\nAll 9 tests passed successfully! ✅")
+    print("\nAll 9 tests passed successfully!")
