@@ -43,7 +43,7 @@ Every model, training loop, gradient computation, and evaluation metric is imple
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/math4ai-capstone.git
+git clone https://github.com/AvazAsgarov/math4ai-capstone.git
 cd math4ai-capstone
 
 # Install dependencies
