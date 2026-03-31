@@ -157,42 +157,7 @@ math4ai-capstone/
 | scikit-learn   | Dataset loading only (digits, moons, blobs)              |
 | LaTeX (ACM)    | Final academic report typesetting                        |
 
----
 
-## Architecture
-
-```mermaid
-graph TD
-    A[config.py] -->|paths, seeds, lambda| B[run_synthetic.py]
-    A -->|paths, seeds, lambda| C[run_digits.py]
-    A -->|paths, seeds, lambda| D[track_a.py]
-
-    B --> E[models/linear.py]
-    B --> F[models/neural.py]
-    B --> G[core/trainer.py]
-    B --> H[visualization/plotters.py]
-
-    C --> E
-    C --> F
-    C --> G
-    C --> I[core/metrics.py]
-
-    D --> E
-    D --> J[math_ops/utilities.py]
-
-    E -->|softmax, CE loss| J
-    F -->|softmax, CE loss| J
-
-    G -->|train loop| E
-    G -->|train loop| F
-    G -->|checkpoint| I
-
-    B -->|figures| K[figures/]
-    C -->|figures + logs| K
-    C -->|logs| L[results/]
-    D -->|figures + logs| K
-    D -->|logs| L
-```
 
 ---
 
