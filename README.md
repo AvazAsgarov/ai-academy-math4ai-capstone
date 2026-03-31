@@ -19,7 +19,6 @@ A from-scratch NumPy implementation comparing multiclass Softmax Regression agai
 - [Features](#features)
 - [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
 - [Key Results](#key-results)
 - [Team](#team)
 
@@ -43,8 +42,8 @@ Every model, training loop, gradient computation, and evaluation metric is imple
 
 ```bash
 # Clone the repository
-git clone https://github.com/AvazAsgarov/math4ai-capstone.git
-cd math4ai-capstone
+git clone https://github.com/AvazAsgarov/ai-academy-math4ai-capstone.git
+cd ai-academy-math4ai-capstone
 
 # Install dependencies
 pip install numpy matplotlib scikit-learn
@@ -108,8 +107,8 @@ Executes 9 sanity checks covering numerical stability, gradient shapes, softmax 
 
 ## Project Structure
 
-```
-math4ai-capstone/
+```text
+ai-academy-math4ai-capstone/
 |
 |-- src/                          # Source package
 |   |-- config.py                 # Global paths, hyperparameters, logger setup
@@ -149,24 +148,22 @@ math4ai-capstone/
 
 ## Tech Stack
 
-| Technology    | Purpose                                                  |
-|---------------|----------------------------------------------------------|
-| Python 3.8+   | Core language                                            |
-| NumPy          | All linear algebra, model parameters, gradient computation |
-| Matplotlib     | Decision boundary plots, scree plots, training dynamics  |
-| scikit-learn   | Dataset loading only (digits, moons, blobs)              |
-| LaTeX (ACM)    | Final academic report typesetting                        |
-
-
+| Technology    | Purpose                                                     |
+|---------------|-------------------------------------------------------------|
+| Python 3.8+   | Core language                                               |
+| NumPy         | All linear algebra, model parameters, gradient computation  |
+| Matplotlib    | Decision boundary plots, scree plots, training dynamics     |
+| scikit-learn  | Dataset loading only (digits, moons, blobs)                 |
+| LaTeX (ACM)   | Final academic report typesetting                           |
 
 ---
 
 ## Key Results
 
-| Model                   | Test Accuracy          | Test Cross-Entropy       |
-|-------------------------|------------------------|--------------------------|
-| Softmax Regression      | 94.73% +/- 0.38%      | 0.2315 +/- 0.0017       |
-| One-Hidden-Layer NN     | 95.22% +/- 0.38%      | 0.1765 +/- 0.0127       |
+| Model                   | Test Accuracy          | Test Cross-Entropy         |
+|-------------------------|------------------------|----------------------------|
+| Softmax Regression      | 94.73% +/- 0.38%       | 0.2315 +/- 0.0017          |
+| One-Hidden-Layer NN     | 95.22% +/- 0.38%       | 0.1765 +/- 0.0127          |
 
 **Main findings:**
 
@@ -183,7 +180,7 @@ The full analysis is available in [`report/Math4AI_Capstone_Report.pdf`](report/
 
 | Name             | Role                                                  | Contact                           |
 |------------------|-------------------------------------------------------|-----------------------------------|
-| Avaz Asgarov     | PCA/SVD analysis, repository management, report       | evez.esgerov25@aiacademy.az       |
-| Raul Aghayev     | Neural Network implementation, synthetic experiments   | raul.agayev25@aiacademy.az        |
-| Emil Ahmadli     | Digits benchmark, repeated-seed evaluation, ablations  | emil.ahmedli25@aiacademy.az       |
-| Kazim Mammadli   | Softmax Regression, training loop, evaluation utilities| kazim.memmedli25@aiacademy.az     |
+| Avaz Asgarov     | PCA/SVD analysis, repository management, report       | <evez.esgerov25@aiacademy.az>     |
+| Raul Aghayev     | Neural Network implementation, synthetic experiments  | <raul.agayev25@aiacademy.az>      |
+| Emil Ahmadli     | Digits benchmark, repeated-seed evaluation, ablations | <emil.ahmedli25@aiacademy.az>     |
+| Kazim Mammadli   | Softmax Regression, training loop, evaluation utilities| <kazim.memmedli25@aiacademy.az>   |
