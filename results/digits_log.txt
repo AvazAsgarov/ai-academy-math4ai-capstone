@@ -17,3 +17,22 @@ Seed 5: Test Accuracy = 0.9565, Test Cross-Entropy = 0.1662
   Momentum: Val Accuracy=0.9662 | Val Cross-Entropy=0.1265
   Adam: Val Accuracy=0.9746 | Val Cross-Entropy=0.0954
 
+Seed 1: Test Accuracy = 0.9429, Test Cross-Entropy = 0.2310
+Seed 2: Test Accuracy = 0.9484, Test Cross-Entropy = 0.2319
+Seed 3: Test Accuracy = 0.9457, Test Cross-Entropy = 0.2314
+Seed 4: Test Accuracy = 0.9511, Test Cross-Entropy = 0.2296
+Seed 5: Test Accuracy = 0.9484, Test Cross-Entropy = 0.2334
+[SoftmaxRegression] Mean Accuracy: 0.9473 +/- 0.0038 (95% CI) | Mean Cross-Entropy: 0.2315 +/- 0.0017 (95% CI)
+
+Seed 1: Test Accuracy = 0.9511, Test Cross-Entropy = 0.1684
+Seed 2: Test Accuracy = 0.9538, Test Cross-Entropy = 0.1907
+Seed 3: Test Accuracy = 0.9511, Test Cross-Entropy = 0.1745
+Seed 4: Test Accuracy = 0.9484, Test Cross-Entropy = 0.1827
+Seed 5: Test Accuracy = 0.9565, Test Cross-Entropy = 0.1662
+[OneHiddenLayerNN] Mean Accuracy: 0.9522 +/- 0.0038 (95% CI) | Mean Cross-Entropy: 0.1765 +/- 0.0127 (95% CI)
+
+[Optimizer Study] SGD vs Momentum vs Adam (width=32, seed=42, 200 epochs)
+  SGD: Val Accuracy=0.9690 | Val Cross-Entropy=0.1256
+  Momentum: Val Accuracy=0.9662 | Val Cross-Entropy=0.1265
+  Adam: Val Accuracy=0.9746 | Val Cross-Entropy=0.0954
+

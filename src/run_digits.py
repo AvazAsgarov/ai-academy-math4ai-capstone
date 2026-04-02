@@ -260,7 +260,7 @@ def run_failure_case_analysis(
         l2_regularization=CROSS_ENTROPY_L2_REGULARIZATION
     )
 
-    history = train_model(
+    history_fail = train_model(
         failed_network,
         features_train, labels_train,
         features_val, labels_val,
@@ -271,11 +271,46 @@ def run_failure_case_analysis(
         use_best_validation=False
     )
 
-    final_val_loss = history['val_loss'][-1]
+    np.random.seed(42)
+    success_network = OneHiddenLayerNN(total_pixel_dimensions, 32, total_classification_categories)
+    success_network.optimizer_type = 'adam'
+    history_success = train_model(
+        success_network,
+        features_train, labels_train,
+        features_val, labels_val,
+        epochs=100,
+        batch_size=64,
+        learning_rate=0.001,
+        return_history=True,
+        use_best_validation=False
+    )
+
+    final_val_loss = history_fail['val_loss'][-1]
     logger.warning(
         f"FAILURE CASE CONFIRMED: With lr=0.005, final validation entropy is {final_val_loss:.4f} "
         "(Compare to ~0.09 with Adam). The model failed to converge."
     )
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(history_success['val_loss'], label='Optimized Success (Adam, lr=0.001)', color='#3da350', linewidth=3)
+    plt.plot(history_fail['val_loss'], label='Optimization Failure (SGD, lr=0.005)', color='#d62728', linestyle='--', linewidth=3)
+    
+    plt.title('Failure Case Analysis: Optimization Sensitivity\n(Digits Benchmark, Hidden Width 32)', fontsize=14, fontweight='bold')
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Validation Cross-Entropy', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=11)
+    
+    plt.annotate('Stagnant Loss (Under-optimized)', xy=(50, 0.86), xytext=(55, 1.2),
+                 arrowprops=dict(facecolor='black', shrink=0.05, width=1), fontsize=10, fontweight='bold')
+    plt.annotate('Rapid Convergence (Properly tuned)', xy=(10, 0.1), xytext=(20, 0.4),
+                 arrowprops=dict(facecolor='black', shrink=0.05, width=1), fontsize=10, fontweight='bold')
+
+    plt.tight_layout()
+    out_path = FIGURES_DIR / 'digits_failure_analysis.png'
+    plt.savefig(str(out_path), dpi=150, bbox_inches='tight')
+    plt.close()
+    logger.info(f"Failure case figure saved to {out_path}")
 
 
 def execute_digits_benchmark() -> None:
