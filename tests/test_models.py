@@ -160,7 +160,7 @@ def test_nn_overfitting():
     y = np.array([0, 1, 0, 1])
 
     model = OneHiddenLayerNN(input_dimensions=d, hidden_dimensions=h, total_classes=k, l2_regularization=0.0)
-    lr = 0.5  # larger lr for faster overfitting
+    lr = 0.5 
 
     for _ in range(100):
         gW1, gb1, gW2, gb2 = model.backward(X, y)
