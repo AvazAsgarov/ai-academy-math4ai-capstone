@@ -128,6 +128,49 @@ def test_nn_backward_shapes():
     print("PASS  test_nn_backward_shapes")
 
 
+def test_nn_loss_decreases():
+    """Neural Network loss must decrease after a few gradient steps on tiny data."""
+    d, h, k, n = 2, 8, 2, 8
+    rng = np.random.default_rng(5)
+    X = rng.standard_normal((n, d))
+    y = np.array([0, 1, 0, 1, 0, 1, 0, 1])
+
+    model = OneHiddenLayerNN(input_dimensions=d, hidden_dimensions=h, total_classes=k, l2_regularization=0.0)
+    lr = 0.1
+
+    loss_before = model.compute_loss(X, y)
+
+    for _ in range(20):
+        gW1, gb1, gW2, gb2 = model.backward(X, y)
+        model.update(gW1, gb1, gW2, gb2, learning_rate=lr)
+
+    loss_after = model.compute_loss(X, y)
+
+    assert loss_after < loss_before, (
+        f"NN Loss did not decrease: before={loss_before:.4f}, after={loss_after:.4f}"
+    )
+    print(f"PASS  test_nn_loss_decreases ({loss_before:.4f} -> {loss_after:.4f})")
+
+
+def test_nn_overfitting():
+    """Neural Network must be able to overfit a tiny batch to near-zero loss."""
+    d, h, k, n = 4, 32, 2, 4
+    rng = np.random.default_rng(6)
+    X = rng.standard_normal((n, d))
+    y = np.array([0, 1, 0, 1])
+
+    model = OneHiddenLayerNN(input_dimensions=d, hidden_dimensions=h, total_classes=k, l2_regularization=0.0)
+    lr = 0.5  # larger lr for faster overfitting
+
+    for _ in range(100):
+        gW1, gb1, gW2, gb2 = model.backward(X, y)
+        model.update(gW1, gb1, gW2, gb2, learning_rate=lr)
+
+    final_loss = model.compute_loss(X, y)
+    assert final_loss < 0.05, f"NN failed to overfit tiny batch: final_loss={final_loss:.4f}"
+    print(f"PASS  test_nn_overfitting (Final Loss: {final_loss:.4f})")
+
+
 if __name__ == "__main__":
     print("\n--- math_utils sanity tests ---")
     test_softmax_values()
@@ -143,5 +186,7 @@ if __name__ == "__main__":
 
     print("\n--- OneHiddenLayerNN tests ---")
     test_nn_backward_shapes()
+    test_nn_loss_decreases()
+    test_nn_overfitting()
     
-    print("\nAll 9 tests passed successfully!")
+    print("\nAll 11 tests passed successfully!")
