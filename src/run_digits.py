@@ -3,6 +3,7 @@ MNIST Digits Benchmark Evaluation.
 
 Executes a robust statistical framework for comparing modeling architectures
 against real-world digit image pixels using repeated random seed instantiations.
+Also runs the required optimizer study (SGD, Momentum, Adam) on the digits benchmark.
 """
 
 import sys
@@ -19,8 +20,13 @@ from src.core.trainer import train_model
 
 logger = setup_logger(__name__)
 
-LEARNING_RATE_ABLATION_SWEEPS = [0.005, 0.05, 0.2]
 BENCHMARK_ITERATION_SEEDS = 5
+
+OPTIMIZER_CONFIGS = [
+    {'name': 'SGD',      'optimizer_type': 'sgd',      'learning_rate': 0.05},
+    {'name': 'Momentum', 'optimizer_type': 'momentum',  'learning_rate': 0.05},
+    {'name': 'Adam',     'optimizer_type': 'adam',      'learning_rate': 0.001},
+]
 
 
 def load_digit_arrays() -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
@@ -126,9 +132,96 @@ def evaluate_statistical_seeds(
                 f"Mean Entropy: {average_entropy:.4f} \u00B1 {confidence_interval_entropy:.4f}")
 
 
+def run_optimizer_study(
+    features_train: np.ndarray,
+    labels_train: np.ndarray,
+    features_val: np.ndarray,
+    labels_val: np.ndarray,
+    total_pixel_dimensions: int,
+    total_classification_categories: int
+) -> None:
+    """
+    Compares SGD, Momentum, and Adam optimizers on the one-hidden-layer NN (width=32).
+
+    All three optimizers use the same train/val split, epoch budget (200), batch size (64),
+    L2 regularization, and fixed random seed (42) for a fair comparison.
+    Results are saved to figures/optimizer_study.png.
+
+    Args:
+        features_train (np.ndarray): Training feature matrix.
+        labels_train (np.ndarray): Training labels.
+        features_val (np.ndarray): Validation feature matrix.
+        labels_val (np.ndarray): Validation labels.
+        total_pixel_dimensions (int): Number of input features (64 for digits).
+        total_classification_categories (int): Number of output classes (10).
+
+    Returns:
+        None
+    """
+    logger.info("Running Optimizer Study: SGD vs Momentum vs Adam on Digits NN (width=32)...")
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle(
+        'Optimizer Study: SGD vs Momentum vs Adam\n(One-Hidden-Layer NN, width=32, digits benchmark)',
+        fontsize=13, fontweight='bold'
+    )
+
+    colors = {'SGD': '#e07b39', 'Momentum': '#3a7ebf', 'Adam': '#3da350'}
+    final_results = {}
+
+    for config in OPTIMIZER_CONFIGS:
+        np.random.seed(42)
+        network = OneHiddenLayerNN(
+            total_pixel_dimensions, 32,
+            total_classification_categories,
+            l2_regularization=CROSS_ENTROPY_L2_REGULARIZATION
+        )
+        network.optimizer_type = config['optimizer_type']
+
+        history = train_model(
+            network,
+            features_train, labels_train,
+            features_val, labels_val,
+            epochs=200,
+            batch_size=64,
+            learning_rate=config['learning_rate'],
+            return_history=True,
+            use_best_validation=False
+        )
+
+        label = config['name']
+        color = colors[label]
+        axes[0].plot(history['val_loss'],   label=label, color=color, linewidth=2)
+        axes[1].plot(history['val_acc'],    label=label, color=color, linewidth=2)
+
+        final_val_loss = history['val_loss'][-1]
+        final_val_acc  = history['val_acc'][-1]
+        final_results[label] = (final_val_loss, final_val_acc)
+        logger.info(
+            f"Measured Entropy: {final_val_loss:.4f} | "
+            f"Optimizer={label} | Final Val Acc: {final_val_acc:.4f} | Final Val CE: {final_val_loss:.4f}"
+        )
+
+    for ax, ylabel, title in [
+        (axes[0], 'Validation Cross-Entropy', 'Validation Loss Dynamics'),
+        (axes[1], 'Validation Accuracy',      'Validation Accuracy Dynamics')
+    ]:
+        ax.set_xlabel('Epoch', fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=11)
+        ax.set_title(title, fontsize=11)
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    out_path = FIGURES_DIR / 'optimizer_study.png'
+    plt.savefig(str(out_path), dpi=150, bbox_inches='tight')
+    plt.close()
+    logger.info(f"Optimizer study figure saved to {out_path}")
+
+
 def execute_digits_benchmark() -> None:
     """
-    Coordinates the full digits benchmark including seed evaluation and learning rate ablation.
+    Coordinates the full digits benchmark: repeated-seed evaluation + optimizer study.
 
     Returns:
         None
@@ -151,36 +244,12 @@ def execute_digits_benchmark() -> None:
         descent_rate=0.1
     )
 
-    logger.info("Executing Descent Rate Dynamical Ablation mapping Phase...")
-
-    try:
-        plt.figure(figsize=(10, 6))
-        for specified_rate in LEARNING_RATE_ABLATION_SWEEPS:
-            np.random.seed(42)
-            ablated_network = OneHiddenLayerNN(total_pixel_dimensions, 32, total_classification_categories)
-            training_history_log = train_model(
-                ablated_network,
-                features_train,
-                labels_train,
-                features_val,
-                labels_val,
-                epochs=100,
-                batch_size=64,
-                learning_rate=specified_rate,
-                return_history=True,
-                use_best_validation=False
-            )
-            plt.plot(training_history_log['val_loss'], label=f'Descent Speed = {specified_rate}')
-            logger.info(f"Speed Rate {specified_rate}: Ultimate Validation Entropy Metric: {training_history_log['val_loss'][-1]:.4f}")
-
-        plt.title('Validation Cross-Entropy Dynamics Distinguishing Parameter Updates')
-        plt.xlabel('Iterative Epoch Configuration')
-        plt.ylabel('Recorded Validation Entropy Measure')
-        plt.legend()
-        plt.savefig(str(FIGURES_DIR / 'lr_ablation.png'))
-        plt.close()
-    except Exception as graphical_err:
-        logger.error(f"Failed to compile graphic outputs. Matplotlib runtime crash -> {graphical_err}")
+    run_optimizer_study(
+        features_train, labels_train,
+        features_val, labels_val,
+        total_pixel_dimensions,
+        total_classification_categories
+    )
 
 
 if __name__ == "__main__":

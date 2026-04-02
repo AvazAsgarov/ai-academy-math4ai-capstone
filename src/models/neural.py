@@ -40,6 +40,11 @@ class OneHiddenLayerNN:
 
         self.l2_regularization = l2_regularization
 
+        self.optimizer_type = 'sgd'
+        self.timestep = 0
+        self.velocity_storage = {}
+        self.moment_storage = {}
+
     def forward(self, features: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Propagates features through the hidden layer to produce output logits.
@@ -144,7 +149,7 @@ class OneHiddenLayerNN:
         learning_rate: float
     ) -> None:
         """
-        Applies gradient descent to update all network parameters.
+        Applies gradient descent to update all network parameters using the configured optimizer.
 
         Args:
             gradient_weight_1 (np.ndarray): Hidden-layer weight gradient of shape (h, d).
@@ -153,7 +158,52 @@ class OneHiddenLayerNN:
             gradient_bias_2 (np.ndarray): Output-layer bias gradient of shape (k,).
             learning_rate (float): Step size for the gradient descent update.
         """
-        self.weight_matrix_1 -= learning_rate * gradient_weight_1
-        self.bias_vector_1 -= learning_rate * gradient_bias_1
-        self.weight_matrix_2 -= learning_rate * gradient_weight_2
-        self.bias_vector_2 -= learning_rate * gradient_bias_2
+        gradients = {
+            'w1': gradient_weight_1,
+            'b1': gradient_bias_1,
+            'w2': gradient_weight_2,
+            'b2': gradient_bias_2
+        }
+
+        parameters = {
+            'w1': self.weight_matrix_1,
+            'b1': self.bias_vector_1,
+            'w2': self.weight_matrix_2,
+            'b2': self.bias_vector_2
+        }
+
+        if not self.velocity_storage:
+            for key, param in parameters.items():
+                self.velocity_storage[key] = np.zeros_like(param)
+                self.moment_storage[key] = np.zeros_like(param)
+
+        self.timestep += 1
+
+        for key in parameters:
+            grad = gradients[key]
+            
+            if self.optimizer_type == 'sgd':
+                parameters[key] -= learning_rate * grad
+
+            elif self.optimizer_type == 'momentum':
+                beta = 0.9
+                self.velocity_storage[key] = beta * self.velocity_storage[key] + (1 - beta) * grad
+                parameters[key] -= learning_rate * self.velocity_storage[key]
+
+            elif self.optimizer_type == 'adam':
+                beta1 = 0.9
+                beta2 = 0.999
+                epsilon = 1e-8
+                
+                self.moment_storage[key] = beta1 * self.moment_storage[key] + (1 - beta1) * grad
+                self.velocity_storage[key] = beta2 * self.velocity_storage[key] + (1 - beta2) * (grad ** 2)
+                
+                m_hat = self.moment_storage[key] / (1 - beta1 ** self.timestep)
+                v_hat = self.velocity_storage[key] / (1 - beta2 ** self.timestep)
+                
+                parameters[key] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+
+        self.weight_matrix_1 = parameters['w1']
+        self.bias_vector_1 = parameters['b1']
+        self.weight_matrix_2 = parameters['w2']
+        self.bias_vector_2 = parameters['b2']
