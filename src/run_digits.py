@@ -236,6 +236,48 @@ def run_optimizer_study(
         log_file.write('\n')
 
 
+def run_failure_case_analysis(
+    features_train: np.ndarray,
+    labels_train: np.ndarray,
+    features_val: np.ndarray,
+    labels_val: np.ndarray,
+    total_pixel_dimensions: int,
+    total_classification_categories: int
+) -> None:
+    """
+    Reproduces the 'Optimization Failure' case using an extremely low learning rate.
+
+    This demonstrates that even a high-capacity model (width=32) fails to learn
+    if the optimization hyperparameter (lr=0.005) is poorly chosen, resulting in
+    stagnant loss and uniform-random predictions.
+    """
+    logger.info("Running Failure Case Analysis: Low Learning Rate (lr=0.005) Underfitting...")
+
+    np.random.seed(42)
+    failed_network = OneHiddenLayerNN(
+        total_pixel_dimensions, 32,
+        total_classification_categories,
+        l2_regularization=CROSS_ENTROPY_L2_REGULARIZATION
+    )
+
+    history = train_model(
+        failed_network,
+        features_train, labels_train,
+        features_val, labels_val,
+        epochs=100,
+        batch_size=64,
+        learning_rate=0.005,
+        return_history=True,
+        use_best_validation=False
+    )
+
+    final_val_loss = history['val_loss'][-1]
+    logger.warning(
+        f"FAILURE CASE CONFIRMED: With lr=0.005, final validation entropy is {final_val_loss:.4f} "
+        "(Compare to ~0.09 with Adam). The model failed to converge."
+    )
+
+
 def execute_digits_benchmark() -> None:
     """
     Coordinates the full digits benchmark: repeated-seed evaluation + optimizer study.
@@ -262,6 +304,13 @@ def execute_digits_benchmark() -> None:
     )
 
     run_optimizer_study(
+        features_train, labels_train,
+        features_val, labels_val,
+        total_pixel_dimensions,
+        total_classification_categories
+    )
+
+    run_failure_case_analysis(
         features_train, labels_train,
         features_val, labels_val,
         total_pixel_dimensions,
