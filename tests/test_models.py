@@ -1,4 +1,4 @@
-"""
+﻿"""
 Basic correctness tests for models.py and utils.py.
 
 Run from the root of the project:
@@ -162,6 +162,9 @@ def test_nn_overfitting():
     model = OneHiddenLayerNN(input_dimensions=d, hidden_dimensions=h, total_classes=k, l2_regularization=0.0)
     lr = 0.5 
 
+=======
+    lr = 0.5  
+>>>>>>> Stashed changes
     for _ in range(100):
         gW1, gb1, gW2, gb2 = model.backward(X, y)
         model.update(gW1, gb1, gW2, gb2, learning_rate=lr)
@@ -190,3 +193,4 @@ if __name__ == "__main__":
     test_nn_overfitting()
     
     print("\nAll 11 tests passed successfully!")
+
