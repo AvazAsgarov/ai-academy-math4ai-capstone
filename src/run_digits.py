@@ -12,7 +12,7 @@ import numpy as np
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src.config import DATA_DIR, FIGURES_DIR, CROSS_ENTROPY_L2_REGULARIZATION, setup_logger
+from src.config import DATA_DIR, FIGURES_DIR, RESULTS_DIR, CROSS_ENTROPY_L2_REGULARIZATION, setup_logger
 from src.models.neural import OneHiddenLayerNN
 from src.models.linear import SoftmaxRegression
 from src.core.metrics import evaluate
@@ -98,6 +98,7 @@ def evaluate_statistical_seeds(
     logger.info(f"Executing {total_instantiations} independent evaluations for {architecture_class.__name__}...")
     accuracy_measurements = []
     entropy_measurements = []
+    log_lines = []
 
     for randomized_seed in range(total_instantiations):
         np.random.seed(randomized_seed)
@@ -117,7 +118,10 @@ def evaluate_statistical_seeds(
         terminal_entropy, terminal_accuracy = evaluate(classifier_instance, features_test, labels_test)
         accuracy_measurements.append(terminal_accuracy)
         entropy_measurements.append(terminal_entropy)
-        logger.info(f"Algorithm Instance {randomized_seed+1}: Holdout Accuracy = {terminal_accuracy:.4f}, Holdout Entropy = {terminal_entropy:.4f}")
+        seed_line = (f"Seed {randomized_seed+1}: Test Accuracy = {terminal_accuracy:.4f}, "
+                     f"Test Cross-Entropy = {terminal_entropy:.4f}")
+        logger.info(seed_line)
+        log_lines.append(seed_line)
 
     average_accuracy = np.mean(accuracy_measurements)
     deviation_accuracy = np.std(accuracy_measurements, ddof=1)
@@ -127,9 +131,16 @@ def evaluate_statistical_seeds(
     deviation_entropy = np.std(entropy_measurements, ddof=1)
     confidence_interval_entropy = 2.776 * (deviation_entropy / np.sqrt(total_instantiations))
 
-    logger.info(f"Aggregated Performance Metrics [{architecture_class.__name__}]: "
-                f"Mean Accuracy: {average_accuracy:.4f} \u00B1 {confidence_interval_accuracy:.4f} | "
-                f"Mean Entropy: {average_entropy:.4f} \u00B1 {confidence_interval_entropy:.4f}")
+    summary_line = (f"[{architecture_class.__name__}] Mean Accuracy: {average_accuracy:.4f} "
+                    f"+/- {confidence_interval_accuracy:.4f} (95% CI) | "
+                    f"Mean Cross-Entropy: {average_entropy:.4f} "
+                    f"+/- {confidence_interval_entropy:.4f} (95% CI)")
+    logger.info(summary_line)
+    log_lines.append(summary_line)
+
+    log_path = RESULTS_DIR / 'digits_log.txt'
+    with open(log_path, 'a', encoding='utf-8') as log_file:
+        log_file.write('\n'.join(log_lines) + '\n\n')
 
 
 def run_optimizer_study(
@@ -145,7 +156,7 @@ def run_optimizer_study(
 
     All three optimizers use the same train/val split, epoch budget (200), batch size (64),
     L2 regularization, and fixed random seed (42) for a fair comparison.
-    Results are saved to figures/optimizer_study.png.
+    Results are saved to figures/digits_optimizer_comparison.png and results/digits_log.txt.
 
     Args:
         features_train (np.ndarray): Training feature matrix.
@@ -197,10 +208,9 @@ def run_optimizer_study(
         final_val_loss = history['val_loss'][-1]
         final_val_acc  = history['val_acc'][-1]
         final_results[label] = (final_val_loss, final_val_acc)
-        logger.info(
-            f"Measured Entropy: {final_val_loss:.4f} | "
-            f"Optimizer={label} | Final Val Acc: {final_val_acc:.4f} | Final Val CE: {final_val_loss:.4f}"
-        )
+        entry = (f"Optimizer={label} | Final Val Accuracy: {final_val_acc:.4f} | "
+                 f"Final Val Cross-Entropy: {final_val_loss:.4f}")
+        logger.info(entry)
 
     for ax, ylabel, title in [
         (axes[0], 'Validation Cross-Entropy', 'Validation Loss Dynamics'),
@@ -213,10 +223,17 @@ def run_optimizer_study(
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    out_path = FIGURES_DIR / 'optimizer_study.png'
+    out_path = FIGURES_DIR / 'digits_optimizer_comparison.png'
     plt.savefig(str(out_path), dpi=150, bbox_inches='tight')
     plt.close()
-    logger.info(f"Optimizer study figure saved to {out_path}")
+    logger.info(f"Optimizer comparison figure saved to {out_path}")
+
+    log_path = RESULTS_DIR / 'digits_log.txt'
+    with open(log_path, 'a', encoding='utf-8') as log_file:
+        log_file.write('[Optimizer Study] SGD vs Momentum vs Adam (width=32, seed=42, 200 epochs)\n')
+        for opt_name, (ce, acc) in final_results.items():
+            log_file.write(f"  {opt_name}: Val Accuracy={acc:.4f} | Val Cross-Entropy={ce:.4f}\n")
+        log_file.write('\n')
 
 
 def execute_digits_benchmark() -> None:
